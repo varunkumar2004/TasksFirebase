@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "67986390505",
+    "project_id": "tasksfirebase-e1d89",
+    "storage_bucket": "tasksfirebase-e1d89.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:67986390505:android:0eadfb6b983a479c3c1f78",
+        "android_client_info": {
+          "package_name": "com.varunkumar.tasks"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0IbbtMyHrX1rL0MqfPF6A6_BhiA0Qs3I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
