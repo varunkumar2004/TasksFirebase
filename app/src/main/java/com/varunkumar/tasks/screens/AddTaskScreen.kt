@@ -41,11 +41,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.varunkumar.tasks.models.Task
+import com.varunkumar.tasks.viewmodels.HomeViewModel
 
 @Composable
 fun AddTaskScreen(
     modifier: Modifier = Modifier,
-    task: Task? = null,
+    task: Task,
+    viewModel: HomeViewModel,
     onDismissRequest: () -> Unit
 ) {
     val fModifier = Modifier.fillMaxWidth()
@@ -57,16 +59,20 @@ fun AddTaskScreen(
         Text(
             modifier = fModifier,
             textAlign = TextAlign.Center,
-            text = task?.let {"Modify Task" } ?: "Add Task",
+            text = "Add Task",
             style = MaterialTheme.typography.headlineSmall
         )
 
         TaskTitle(
-            modifier = fModifier
+            modifier = fModifier,
+            task = task,
+            onValueTitleChange = viewModel::updateTitle,
+            onValueDescriptionChange = viewModel::updateDescription
         )
 
         TaskButtons(
             modifier = fModifier,
+            task = task,
             onDismissRequest = onDismissRequest
         )
     }
@@ -74,16 +80,11 @@ fun AddTaskScreen(
 
 @Composable
 private fun TaskTitle(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    task: Task,
+    onValueTitleChange: (String) -> Unit,
+    onValueDescriptionChange: (String) -> Unit
 ) {
-    var title by remember {
-        mutableStateOf("")
-    }
-
-    var description by remember {
-        mutableStateOf("")
-    }
-
     val textFieldColors = TextFieldDefaults.colors(
         unfocusedIndicatorColor = Color.Transparent,
         focusedIndicatorColor = Color.Transparent,
@@ -98,24 +99,20 @@ private fun TaskTitle(
     ) {
         TextField(
             modifier = modifier,
-            value = title,
-            shape = RoundedCornerShape(10.dp),
+            value = task.title,
+            shape = RoundedCornerShape(5.dp),
             colors = textFieldColors,
             label = { Text(text = "Title") },
-            onValueChange = {
-                title = it
-            }
+            onValueChange = onValueTitleChange
         )
 
         TextField(
             modifier = modifier,
-            value = description,
+            value = task.description,
             colors = textFieldColors,
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(5.dp),
             label = { Text(text = "Description") },
-            onValueChange = {
-                description = it
-            }
+            onValueChange = onValueDescriptionChange
         )
     }
 }
@@ -123,6 +120,7 @@ private fun TaskTitle(
 @Composable
 private fun TaskButtons(
     modifier: Modifier = Modifier,
+    task: Task,
     onDismissRequest: () -> Unit
 ) {
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -178,6 +176,8 @@ private fun TaskButtons(
             ) {
                 Icon(imageVector = Icons.Outlined.MoreTime, contentDescription = "Add Time")
             }
+
+            Text(text = task.datetime.toString())
         }
 
         Button(onClick = onDismissRequest) {
