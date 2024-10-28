@@ -26,9 +26,9 @@ object HomeScreen : ScreenRoute {
 }
 
 @Serializable
-object CalendarScreen : ScreenRoute {
-    override val route: String = "calendar_screen"
-    override val title: String = "Calendar"
-    override val outlinedIcon: ImageVector = Icons.Outlined.CalendarToday
-    override val filledIcon: ImageVector = Icons.Filled.CalendarMonth
+object SignInScreen : ScreenRoute {
+    override val route: String = "sign_in_screen"
+    override val title: String = "Profile"
+    override val outlinedIcon: ImageVector = Icons.Outlined.Home
+    override val filledIcon: ImageVector = Icons.Filled.Home
 }

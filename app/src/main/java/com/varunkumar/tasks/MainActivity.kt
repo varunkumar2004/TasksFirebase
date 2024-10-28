@@ -1,9 +1,13 @@
 package com.varunkumar.tasks
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,28 +21,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,24 +50,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil3.compose.AsyncImage
+import com.varunkumar.tasks.models.UserData
 import com.varunkumar.tasks.screens.AddTaskScreen
-import com.varunkumar.tasks.screens.CalendarScreen
 import com.varunkumar.tasks.screens.HomeScreen
 import com.varunkumar.tasks.sign_in.GoogleAuthUiClient
+import com.varunkumar.tasks.sign_in.SignInScreen
 import com.varunkumar.tasks.ui.theme.TasksFirebaseTheme
-import com.varunkumar.tasks.utils.CalendarScreen
 import com.varunkumar.tasks.utils.HomeScreen
 import com.varunkumar.tasks.utils.ScreenRoute
+import com.varunkumar.tasks.utils.SignInScreen
 import com.varunkumar.tasks.viewmodels.HomeViewModel
+import com.varunkumar.tasks.viewmodels.SignInViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @Inject lateinit var googleAuthUiClient: GoogleAuthUiClient
+    @Inject
+    lateinit var googleAuthUiClient: GoogleAuthUiClient
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,14 +86,13 @@ class MainActivity : ComponentActivity() {
             var showBottomSheet by remember { mutableStateOf(false) }
 
             val navController = rememberNavController()
-            var selectedRoute by remember { mutableStateOf<ScreenRoute>(HomeScreen) }
-            val showFloatingButton by remember {
-                mutableStateOf(selectedRoute == HomeScreen)
-            }
+
+            var selectedRoute by remember { mutableStateOf<ScreenRoute>(SignInScreen) }
 
             var showAccountAlert by remember { mutableStateOf(false) }
 
             val homeViewModel = hiltViewModel<HomeViewModel>()
+            val signInViewModel = hiltViewModel<SignInViewModel>()
 
             TasksFirebaseTheme {
                 if (showBottomSheet) {
@@ -112,7 +116,9 @@ class MainActivity : ComponentActivity() {
                             .clip(RoundedCornerShape(20.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainer)
                             .padding(10.dp),
-                        onDismissRequest = { showAccountAlert = false }
+                        onDismissRequest = { showAccountAlert = false },
+                        user = if (selectedRoute == HomeScreen) googleAuthUiClient.getSignedInUser()!!
+                        else null
                     )
                 }
 
@@ -124,31 +130,63 @@ class MainActivity : ComponentActivity() {
                         TopBar(
                             modifier = Modifier
                                 .fillMaxWidth(),
+                            user = if (selectedRoute == HomeScreen) googleAuthUiClient.getSignedInUser()!! else null,
                             selectedRoute = selectedRoute,
                             onProfileClick = { showAccountAlert = true }
                         )
                     },
-                    bottomBar = {
-                        BottomNavigation(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            selectedRoute = selectedRoute,
-                            onClick = { route ->
-                                selectedRoute = route
-                                navController.navigate(route)
-                            }
-                        )
-                    },
                     floatingActionButton = {
-                        FloatingActionButton(
-                            onClick = { showBottomSheet = true },
-                            shape = CircleShape
-                        ) {
-                            Icon(imageVector = Icons.Outlined.Add, contentDescription = null)
+                        if (selectedRoute == HomeScreen) {
+                            FloatingActionButton(
+                                onClick = { showBottomSheet = true },
+                                shape = CircleShape
+                            ) {
+                                Icon(imageVector = Icons.Outlined.Add, contentDescription = null)
+                            }
                         }
                     }
                 ) { innerPadding ->
-                    NavHost(navController = navController, startDestination = HomeScreen) {
+
+                    val signState by signInViewModel.state.collectAsStateWithLifecycle()
+
+                    LaunchedEffect(Unit) {
+                        if (googleAuthUiClient.getSignedInUser() != null) {
+                            navController.navigate(SignInScreen)
+                        }
+                    }
+
+                    val launcher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.StartIntentSenderForResult(),
+                        onResult = { result ->
+                            if (result.resultCode == RESULT_OK) {
+                                lifecycleScope.launch {
+                                    val signInResult = googleAuthUiClient.signInWithIntent(
+                                        intent = result.data ?: return@launch
+                                    )
+                                    signInViewModel.onSignInResult(signInResult)
+                                }
+                            }
+                        }
+                    )
+
+                    LaunchedEffect(key1 = signState.isSignInSuccessful) {
+                        if (signState.isSignInSuccessful) {
+                            Toast.makeText(
+                                applicationContext,
+                                "Sign in successful",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            navController.navigate(HomeScreen)
+                            selectedRoute = HomeScreen
+                            signInViewModel.resetState()
+                        }
+                    }
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = SignInScreen
+                    ) {
                         composable<HomeScreen> {
                             HomeScreen(
                                 modifier = screenModifier
@@ -161,10 +199,21 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable<CalendarScreen> {
-                            CalendarScreen(
+                        composable<SignInScreen> {
+                            SignInScreen(
                                 modifier = screenModifier
-                                    .padding(innerPadding)
+                                    .padding(innerPadding),
+                                state = signState,
+                                onSignInClick = {
+                                    lifecycleScope.launch {
+                                        val signInIntentSender = googleAuthUiClient.signIn()
+                                        launcher.launch(
+                                            IntentSenderRequest.Builder(
+                                                signInIntentSender ?: return@launch
+                                            ).build()
+                                        )
+                                    }
+                                }
                             )
                         }
                     }
@@ -179,6 +228,7 @@ class MainActivity : ComponentActivity() {
 private fun TopBar(
     modifier: Modifier = Modifier,
     selectedRoute: ScreenRoute,
+    user: UserData?,
     onProfileClick: () -> Unit
 ) {
     CenterAlignedTopAppBar(
@@ -192,69 +242,34 @@ private fun TopBar(
         },
         modifier = modifier,
         actions = {
-            ProfileImage(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable { onProfileClick() }
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
+            if (selectedRoute == HomeScreen) {
+                ProfileImage(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable { onProfileClick() }
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                    user = user
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            }
         }
     )
 }
 
 @Composable
-private fun BottomNavigation(
-    modifier: Modifier = Modifier,
-    selectedRoute: ScreenRoute,
-    onClick: (ScreenRoute) -> Unit
-) {
-    NavigationBar(
-        modifier = modifier
-    ) {
-        NavigationBarItem(
-            selected = selectedRoute == HomeScreen,
-            onClick = { onClick(HomeScreen) },
-            icon = {
-                Icon(
-                    imageVector =
-                    if (selectedRoute == HomeScreen)
-                        HomeScreen.filledIcon
-                    else HomeScreen.outlinedIcon,
-                    contentDescription = HomeScreen.title
-                )
-            }
-        )
-
-        NavigationBarItem(
-            selected = selectedRoute == CalendarScreen,
-            onClick = { onClick(CalendarScreen) },
-            icon = {
-                Icon(
-                    imageVector =
-                    if (selectedRoute == CalendarScreen)
-                        CalendarScreen.filledIcon
-                    else CalendarScreen.outlinedIcon,
-                    contentDescription = CalendarScreen.title
-                )
-            }
-        )
-    }
-}
-
-@Composable
 private fun ProfileImage(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    user: UserData?
 ) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-//        Icon(
-//            imageVector = Icons.Outlined.PersonOutline,
-//            contentDescription = "profile_img"
-//        )
+        AsyncImage(
+            model = user?.profilePictureUrl,
+            contentDescription = user?.username
+        )
     }
 }
 
@@ -262,6 +277,7 @@ private fun ProfileImage(
 @Composable
 private fun AccountAlert(
     modifier: Modifier = Modifier,
+    user: UserData?,
     onDismissRequest: () -> Unit
 ) {
     BasicAlertDialog(
@@ -278,7 +294,8 @@ private fun AccountAlert(
                 modifier = Modifier
                     .size(60.dp)
                     .clip(CircleShape)
-                    .background(Color.Black)
+                    .background(Color.Black),
+                user = user
             )
 
             Text(
