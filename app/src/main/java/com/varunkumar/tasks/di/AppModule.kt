@@ -2,6 +2,9 @@ package com.varunkumar.tasks.di
 
 import android.content.Context
 import com.google.android.gms.auth.api.identity.Identity
+import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.varunkumar.tasks.sign_in.GoogleAuthUiClient
 import dagger.Module
 import dagger.Provides
@@ -21,5 +24,17 @@ object AppModule {
            context = context,
            oneTapClient = Identity.getSignInClient(context)
        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideFirebaseAuth(): FirebaseAuth {
+        return FirebaseAuth.getInstance()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFirebaseDatabase(): FirebaseDatabase {
+        return FirebaseDatabase.getInstance()
     }
 }

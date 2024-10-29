@@ -1,5 +1,6 @@
 package com.varunkumar.tasks.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.varunkumar.tasks.models.Task
 import com.varunkumar.tasks.models.UserData
 import com.varunkumar.tasks.viewmodels.HomeViewModel
@@ -49,25 +51,26 @@ fun HomeScreen(
     ) {
         val options = listOf("All", "Completed")
         var selectedIndex by remember { mutableIntStateOf(0) }
+        val tasks by viewModel.tasks.collectAsStateWithLifecycle(initialValue = emptyList())
 
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier
-        ) {
-            options.forEachIndexed { index, label ->
-                SegmentedButton(
-                    modifier = Modifier,
-                    shape = RectangleShape,
-                    onClick = { selectedIndex = index },
-                    selected = index == selectedIndex
-                ) {
-                    Text(label)
-                }
-            }
-        }
+//        SingleChoiceSegmentedButtonRow(
+//            modifier = Modifier
+//        ) {
+//            options.forEachIndexed { index, label ->
+//                SegmentedButton(
+//                    modifier = Modifier,
+//                    shape = RectangleShape,
+//                    onClick = { selectedIndex = index },
+//                    selected = index == selectedIndex
+//                ) {
+//                    Text(label)
+//                }
+//            }
+//        }
 
         TaskCategoriesView(
             modifier = Modifier.fillMaxWidth(),
-            tasks = viewModel.tasks,
+            tasks = tasks,
             onTaskClick = onTaskClick
         )
     }
@@ -84,14 +87,19 @@ private fun TaskCategoriesView(
             .clip(RoundedCornerShape(20.dp))
     ) {
         itemsIndexed(tasks) { index, item ->
-            TaskItem(
-                modifier = modifier
-                    .clip(RoundedCornerShape(5.dp))
-                    .clickable { onTaskClick(item) }
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(vertical = 10.dp, horizontal = 5.dp),
-                task = item
-            )
+            AnimatedContent(
+                targetState = item,
+                label = "Task Item"
+            ) {
+                TaskItem(
+                    modifier = modifier
+                        .clip(RoundedCornerShape(5.dp))
+                        .clickable { onTaskClick(item) }
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .padding(vertical = 10.dp, horizontal = 5.dp),
+                    task = it
+                )
+            }
 
             if (index != tasks.lastIndex) Spacer(modifier = Modifier.height(2.dp))
         }

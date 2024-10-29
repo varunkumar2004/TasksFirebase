@@ -73,7 +73,10 @@ fun AddTaskScreen(
         TaskButtons(
             modifier = fModifier,
             task = task,
-            onDismissRequest = onDismissRequest
+            onDismissRequest = {
+                viewModel.addTask()
+                onDismissRequest()
+            }
         )
     }
 }
@@ -177,7 +180,7 @@ private fun TaskButtons(
                 Icon(imageVector = Icons.Outlined.MoreTime, contentDescription = "Add Time")
             }
 
-            Text(text = task.datetime.toString())
+//            Text(text = task.datetime.toString())
         }
 
         Button(onClick = onDismissRequest) {

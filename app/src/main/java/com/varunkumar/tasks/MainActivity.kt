@@ -1,6 +1,7 @@
 package com.varunkumar.tasks
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -78,7 +79,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         enableEdgeToEdge()
+
         setContent {
             val screenModifier = Modifier
                 .fillMaxSize()
@@ -136,24 +139,27 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     floatingActionButton = {
-                        if (selectedRoute == HomeScreen) {
-                            FloatingActionButton(
-                                onClick = { showBottomSheet = true },
-                                shape = CircleShape
-                            ) {
-                                Icon(imageVector = Icons.Outlined.Add, contentDescription = null)
-                            }
+//                        if (selectedRoute == HomeScreen) {
+                        FloatingActionButton(
+                            onClick = {
+                                showBottomSheet = true
+                            },
+                            shape = CircleShape
+                        ) {
+                            Icon(imageVector = Icons.Outlined.Add, contentDescription = null)
                         }
+//                        }
                     }
                 ) { innerPadding ->
 
                     val signState by signInViewModel.state.collectAsStateWithLifecycle()
 
-                    LaunchedEffect(Unit) {
-                        if (googleAuthUiClient.getSignedInUser() != null) {
-                            navController.navigate(SignInScreen)
-                        }
-                    }
+//                    LaunchedEffect(Unit) {
+//                        if (googleAuthUiClient.getSignedInUser() != null) {
+//                            Log.d("user name", googleAuthUiClient.getSignedInUser()?.toString() ?: "nothing but a")
+//                            navController.navigate(SignInScreen)
+//                        }
+//                    }
 
                     val launcher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.StartIntentSenderForResult(),
@@ -185,7 +191,7 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = SignInScreen
+                        startDestination = HomeScreen
                     ) {
                         composable<HomeScreen> {
                             HomeScreen(
