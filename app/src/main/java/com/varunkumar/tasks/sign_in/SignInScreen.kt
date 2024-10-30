@@ -7,9 +7,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,7 +38,6 @@ import com.varunkumar.tasks.viewmodels.SignInState
 
 @Composable
 fun SignInScreen(
-    modifier: Modifier = Modifier,
     state: SignInState,
     onSignInClick: () -> Unit
 ) {
@@ -52,7 +54,9 @@ fun SignInScreen(
     }
 
     Column(
-        modifier = modifier,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -71,11 +75,10 @@ fun SignInScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        TextButton(onClick = onSignInClick) {
+        Button(onClick = onSignInClick) {
             val annotatedString = buildAnnotatedString {
                 withStyle(
                     style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 25.sp
                     )
                 ) {
@@ -84,7 +87,6 @@ fun SignInScreen(
 
                 withStyle(
                     style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
                         fontStyle = FontStyle.Italic,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold
