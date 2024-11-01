@@ -10,23 +10,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.outlined.MoreTime
-import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,11 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.varunkumar.tasks.models.Task
 import com.varunkumar.tasks.utils.formatTime
@@ -54,11 +51,10 @@ import com.varunkumar.tasks.viewmodels.HomeViewModel
 
 @Composable
 fun AddTaskScreen(
-    task: Task,
     viewModel: HomeViewModel
 ) {
     val fModifier = Modifier.fillMaxWidth()
-    val isUpdatingTask = task != Task()
+    val state by viewModel.homeState.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -68,43 +64,39 @@ fun AddTaskScreen(
     ) {
         Text(
             modifier = fModifier,
-            text = "${if (isUpdatingTask) "Update" else "Add"} Task",
+            text = "${if (state.isUpdatingTask) "Update" else "Add"} Task",
             style = MaterialTheme.typography.headlineSmall
         )
 
         TaskTitle(
             modifier = fModifier,
-            task = task,
+            task = state.task,
             onValueTitleChange = viewModel::updateTitle,
             onValueDescriptionChange = viewModel::updateDescription
         )
 
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = task.taskCategory ?: "",
+            value = state.task.taskCategory?.category ?: "",
             singleLine = true,
             shape = RoundedCornerShape(20.dp),
-            label = { Text(text = "Category (Optional)") },
+            placeholder = { Text(text = "Category (Optional)") },
             onValueChange = viewModel::updateTaskCategory
         )
 
-        task.imageUri?.let { url ->
-            TaskImage(
-                modifier = fModifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceBright),
-                image = url
-            )
-        }
+        TaskImage(
+            modifier = fModifier,
+            image = state.task.imageUri,
+            viewModel = viewModel,
+        )
 
         TaskButtons(
             modifier = fModifier,
-            task = task,
+            task = state.task,
             viewModel = viewModel,
-            isUpdatingTask = isUpdatingTask,
-            onImageClick = viewModel::updateImageUri,
+            isUpdatingTask = state.isUpdatingTask,
             onDismissRequest = {
-                viewModel.addTask(isUpdatingTask)
+                viewModel.addTaskFirebase(state.isUpdatingTask)
             }
         )
     }
@@ -140,7 +132,7 @@ private fun TaskTitle(
 
         TextField(
             modifier = modifier,
-            value = task.description,
+            value = task.description ?: "",
             colors = textFieldColors,
             shape = RoundedCornerShape(5.dp),
             label = { Text(text = "Description") },
@@ -152,19 +144,60 @@ private fun TaskTitle(
 @Composable
 private fun TaskImage(
     modifier: Modifier = Modifier,
-    image: String
+    image: String?,
+    viewModel: HomeViewModel
 ) {
-    Box(
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null && uri != Uri.EMPTY) {
+            viewModel.updateImageUri(uri.toString())
+        }
+    }
+
+    OutlinedCard(
         modifier = modifier,
-        contentAlignment = Alignment.Center
+        shape = RoundedCornerShape(20.dp),
+        onClick = {
+            launcher.launch(
+                PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                )
+            )
+        }
     ) {
-        AsyncImage(
-            modifier = Modifier
-                .aspectRatio(1f)
-                .clipToBounds(),
-            model = image,
-            contentDescription = null
-        )
+        Box(
+            modifier = modifier
+                .padding(16.dp)
+                .heightIn(min = 100.dp, max = 100.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (image == null) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = null
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Text(text = "Select Image")
+                } else {
+                    Text(text = "Image")
+
+                    Spacer(modifier = Modifier.width(20.dp))
+
+                    AsyncImage(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp)),
+                        model = image,
+                        contentDescription = null
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -174,15 +207,8 @@ private fun TaskButtons(
     task: Task,
     isUpdatingTask: Boolean,
     viewModel: HomeViewModel,
-    onImageClick: (String) -> Unit,
     onDismissRequest: () -> Unit
 ) {
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        onImageClick(uri.toString())
-    }
-
     var showTimeAlert by remember {
         mutableStateOf(false)
     }
@@ -207,61 +233,42 @@ private fun TaskButtons(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
+        TextButton(
+            onClick = { showTimeAlert = true }
         ) {
-            TextButton(
-                onClick = {
-                    launcher.launch(
-                        PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                        )
-                    )
-                }
-            ) {
-                if (!task.imageUri.isNullOrBlank() && task.imageUri.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .size(20.dp)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "1",
-                            color = MaterialTheme.colorScheme.surfaceContainer
-                        )
-                    }
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.AddPhotoAlternate,
-                        contentDescription = "Add Image"
-                    )
-                }
+            if (task.startTaskTime != null) {
+                Text(text = task.startTaskTime)
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.MoreTime,
+                    contentDescription = "Add Time"
+                )
             }
-
-            TextButton(
-                onClick = { showTimeAlert = true }
-            ) {
-                if (task.startTaskTime != null) {
-                    Text(text = task.startTaskTime)
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.MoreTime,
-                        contentDescription = "Add Time"
-                    )
-                }
-            }
-
-//            Text(text = task.datetime.toString())
         }
 
-        Button(
-            onClick = {
-                if (task.title.isNotBlank() || task.title.isNotEmpty()) onDismissRequest()
-            }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = if (isUpdatingTask) "Update" else "Add")
+            if (isUpdatingTask) {
+                Button(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    onClick = { viewModel.deleteTaskFirebase() }
+                ) {
+                    Text(text = "Delete")
+                }
+            }
+
+            Button(
+                onClick = {
+                    if (task.title.isNotBlank() || task.title.isNotEmpty()) onDismissRequest()
+                }
+            ) {
+                Text(text = if (isUpdatingTask) "Update" else "Add")
+            }
         }
     }
 }

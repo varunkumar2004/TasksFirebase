@@ -1,5 +1,8 @@
 package com.varunkumar.tasks.viewmodels
 
+import android.util.Log
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.MutableState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -8,7 +11,12 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.snapshots
+import com.google.firebase.firestore.toObject
 import com.varunkumar.tasks.models.Task
+import com.varunkumar.tasks.models.TaskCategory
+import com.varunkumar.tasks.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
@@ -18,8 +26,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,142 +37,233 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val firebaseDatabase: FirebaseDatabase
+    private val firestore: FirebaseFirestore
 ) : ViewModel() {
-    private val _task = MutableStateFlow(Task())
-    private val _showBottomSheet = MutableStateFlow(false)
+    private val _homeState = MutableStateFlow(HomeState())
     private val _categoryState = MutableStateFlow(CategoryState())
-    private val user = getCurrentUser()
-    private val _tasks: Flow<List<Task>> = callbackFlow {
-        val reference = firebaseDatabase.getReference(user!!.uid)
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val dataList = mutableListOf<Task>()
+    private val user = getCurrentUser()!!
+    private val _tasks = MutableStateFlow(emptyList<Task>())
 
-                snapshot.children.forEach { child ->
-                    val data = child.getValue(Task::class.java)
-                    data?.let { task ->
-                        _categoryState.value.categories.add(task.taskCategory ?: "All")
-                        dataList.add(task)
-                    }
-                }
-
-                trySend(dataList).isSuccess
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                close(error.toException())
-            }
-        }
-
-        reference.addValueEventListener(listener)
-        awaitClose { reference.removeEventListener(listener) }
+    init {
+        getTasks()
     }
-
-    val task = _task.asStateFlow()
 
     val categoryState = _categoryState.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val showModelBottomSheet = _showBottomSheet.flatMapLatest { status ->
-        when (status) {
-            false -> resetTask()
+    val homeState = _homeState.flatMapLatest { state ->
+        when (state.showBottomSheet) {
+            false -> _homeState.update { it.copy(task = Task()) }
             else -> {}
         }
-        _showBottomSheet
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), false)
+
+        _homeState
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), HomeState())
 
     val tasks = combine(_categoryState, _tasks) { state, tasks ->
-        tasks.filter { task ->
-            when (state.selectedCategory) {
-                "All" -> true
-                else -> task.taskCategory == state.selectedCategory
-            }
+        tasks.filter {
+            true
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
 
+    // local task update functions
     fun updateTask(newTask: Task) {
-        _task.update { newTask }
-        _showBottomSheet.update { true }
+        _homeState.update {
+            it.copy(
+                task = newTask,
+                isUpdatingTask = true,
+                showBottomSheet = true
+            )
+        }
     }
 
     fun updateTitle(newTitle: String) {
-        _task.update { it.copy(title = newTitle) }
+        _homeState.update {
+            it.copy(
+                task = it.task.copy(title = newTitle)
+            )
+        }
     }
 
     fun updateDescription(newDescription: String) {
-        _task.update { it.copy(description = newDescription) }
-    }
-
-    fun updateTaskStatus(task: Task) {
-        viewModelScope.launch {
-            val reference = firebaseDatabase.getReference(user!!.uid)
-            val newTask = task.copy(isCompleted = !task.isCompleted)
-
-            reference
-                .child(task.creationTime.toString())
-                .setValue(newTask)
-                .await()
+        _homeState.update {
+            it.copy(
+                task = it.task.copy(description = newDescription)
+            )
         }
     }
 
-    fun updateImageUri(newImageUri: String) {
-        _task.update { it.copy(imageUri = newImageUri) }
+    fun updateImageUri(newImageUri: String?) {
+        _homeState.update {
+            it.copy(
+                task = it.task.copy(imageUri = newImageUri)
+            )
+        }
     }
 
     fun updateTaskCategory(newCategory: String) {
-        _task.update { it.copy(taskCategory = newCategory) }
+        _homeState.update {
+            it.copy(
+                task = it.task.copy(taskCategory = TaskCategory(newCategory))
+            )
+        }
     }
 
     fun updateTimeStamps(startTime: String) {
-        _task.update { it.copy(startTaskTime = startTime) }
+        _homeState.update {
+            it.copy(
+                task = it.task.copy(startTaskTime = startTime)
+            )
+        }
     }
 
     fun updateBottomSheet(newState: Boolean) {
-        _showBottomSheet.update { newState }
+        _homeState.update { it.copy(showBottomSheet = newState) }
     }
 
-    private fun modifyTaskFirebase() {
-        viewModelScope.launch {
-            user?.let {
-                firebaseDatabase
-                    .getReference(it.uid)
-                    .child(_task.value.creationTime.toString())
-                    .setValue(_task.value)
-                    .await()
-            } ?: return@launch
-
-            _showBottomSheet.update { false }
-        }
-    }
-
-    private fun insertTaskFirebase() {
-        viewModelScope.launch {
-            val datetime = System.currentTimeMillis()
-            _task.update { it.copy(creationTime = datetime) }
-
-            user?.let {
-                firebaseDatabase
-                    .getReference(it.uid)
-                    .child(datetime.toString())
-                    .setValue(_task.value)
-                    .await()
-            } ?: return@launch
-
-            _showBottomSheet.update { false }
-        }
-    }
-
-    fun addTask(isUpdatingTask: Boolean) {
-        if (isUpdatingTask) modifyTaskFirebase() else insertTaskFirebase()
-    }
-
-    fun updateSelectedCategory(newCategory: String) {
+    fun updateSelectedCategory(newCategory: TaskCategory) {
         _categoryState.update { it.copy(selectedCategory = newCategory) }
     }
 
+    fun updateIsUpdatingTask(isUpdating: Boolean) {
+        _homeState.update { it.copy(isUpdatingTask = isUpdating) }
+    }
+
+    // firebase update functions
+    fun addTaskFirebase(isUpdatingTask: Boolean) {
+        try {
+            viewModelScope.launch {
+                _homeState.update {
+                    it.copy(result = Result.Loading())
+                }
+
+                val dateTime =
+                    if (!isUpdatingTask) System.currentTimeMillis() else _homeState.value.task.creationTime
+
+                if (!isUpdatingTask) {
+                    _homeState.update { it.copy(task = it.task.copy(creationTime = dateTime)) }
+                }
+
+                firestore
+                    .collection(user.uid)
+                    .document(dateTime.toString())
+                    .set(_homeState.value.task)
+                    .await()
+
+                getTasks()
+
+                _homeState.update {
+                    it.copy(
+                        result = Result.Success(true),
+                        showBottomSheet = false
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            _homeState.update {
+                it.copy(
+                    result = Result.Error(e.message),
+                    showBottomSheet = false
+                )
+            }
+        }
+    }
+
+    fun deleteTaskFirebase() {
+        try {
+            viewModelScope.launch {
+                _homeState.update {
+                    it.copy(result = Result.Loading())
+                }
+
+                firestore
+                    .collection(user.uid)
+                    .document(_homeState.value.task.creationTime.toString())
+                    .delete()
+                    .await()
+
+                getTasks()
+
+                _homeState.update {
+                    it.copy(
+                        result = Result.Success(true),
+                        showBottomSheet = false
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            _homeState.update {
+                it.copy(
+                    result = Result.Error(e.message),
+                    showBottomSheet = false
+                )
+            }
+        }
+    }
+
+    fun updateTaskStatusFirebase(task: Task) {
+        try {
+            viewModelScope.launch {
+                _homeState.update { it.copy(result = Result.Loading()) }
+
+                firestore
+                    .collection(user.uid)
+                    .document(task.creationTime.toString())
+                    .update("isCompleted", !task.isCompleted)
+                    .await()
+
+                getTasks()
+
+                _homeState.update { it.copy(result = Result.Success(true)) }
+            }
+        } catch (e: Exception) {
+            _homeState.update { it.copy(result = Result.Error(e.message)) }
+        }
+    }
+
     private fun resetTask() {
-        _task.update { Task() }
+        _homeState.update { it.copy(task = Task()) }
+    }
+
+    private fun getTasks() {
+        try {
+            viewModelScope.launch {
+                _homeState.update { it.copy(result = Result.Loading()) }
+
+                firestore
+                    .collection(user.uid)
+                    .addSnapshotListener { querySnapshot, firebaseFirestoreException ->
+                        if (firebaseFirestoreException != null) {
+                            _homeState.update {
+                                it.copy(
+                                    result = Result.Error(
+                                        firebaseFirestoreException.message
+                                    )
+                                )
+                            }
+                            return@addSnapshotListener
+                        }
+
+                        Log.d("change firestore", "aksldfh aklshd fkjalshdlf kasd")
+
+                        if (querySnapshot != null && !querySnapshot.isEmpty) {
+                            _tasks.update {
+                                querySnapshot.documents.mapNotNull { snapshot ->
+                                    val task = snapshot.toObject(Task::class.java)
+
+                                    task?.taskCategory?.let {
+
+                                    }
+
+                                    task
+                                }
+                            }
+                        }
+                    }
+            }
+        } catch (e: Exception) {
+            _homeState.update { it.copy(result = Result.Loading()) }
+        }
     }
 
     private fun getCurrentUser(): FirebaseUser? {
@@ -172,7 +271,16 @@ class HomeViewModel @Inject constructor(
     }
 }
 
+data class HomeState(
+    val result: Result<Boolean> = Result.Success(true),
+    val isUpdatingTask: Boolean = false,
+    val showBottomSheet: Boolean = false,
+    val task: Task = Task(),
+    val tasks: MutableList<Task> = mutableListOf()
+)
+
 data class CategoryState(
-    val selectedCategory: String = "All",
-    val categories: MutableSet<String> = mutableSetOf("All")
+    val selectedCategory: TaskCategory = TaskCategory("All"),
+    val isUpdatingTask: Boolean = false,
+    val categories: MutableSet<TaskCategory> = mutableSetOf()
 )

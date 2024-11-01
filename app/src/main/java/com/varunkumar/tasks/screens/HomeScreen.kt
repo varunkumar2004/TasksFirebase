@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -34,7 +33,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,10 +51,7 @@ import com.varunkumar.tasks.models.Task
 import com.varunkumar.tasks.models.UserData
 import com.varunkumar.tasks.presentation.components.ProfileImage
 import com.varunkumar.tasks.presentation.components.TopBar
-import com.varunkumar.tasks.sign_in.SignInResult
 import com.varunkumar.tasks.viewmodels.HomeViewModel
-import com.varunkumar.tasks.viewmodels.SignInState
-import kotlin.math.sign
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -63,20 +59,18 @@ fun HomeScreen(
     user: UserData
 ) {
     val viewModel = hiltViewModel<HomeViewModel>()
-    val showBottomSheet by viewModel.showModelBottomSheet.collectAsStateWithLifecycle(false)
-    val task by viewModel.task.collectAsStateWithLifecycle()
     val categoryState by viewModel.categoryState.collectAsStateWithLifecycle()
+    val homeState by viewModel.homeState.collectAsStateWithLifecycle()
 
     var showAccountAlert by remember {
         mutableStateOf(false)
     }
 
-    if (showBottomSheet) {
+    if (homeState.showBottomSheet) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.updateBottomSheet(false) }
         ) {
             AddTaskScreen(
-                task = task,
                 viewModel = viewModel
             )
         }
@@ -106,7 +100,10 @@ fun HomeScreen(
         floatingActionButton = {
             FloatingActionButton(
                 shape = CircleShape,
-                onClick = { viewModel.updateBottomSheet(true) }
+                onClick = {
+                    viewModel.updateIsUpdatingTask(false)
+                    viewModel.updateBottomSheet(true)
+                }
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Add,
@@ -122,14 +119,12 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            val tasks by viewModel.tasks.collectAsStateWithLifecycle(initialValue = emptyList())
-
             FlowRow {
                 categoryState.categories.forEach { item ->
                     FilterChip(
                         selected = item == categoryState.selectedCategory,
                         onClick = { viewModel.updateSelectedCategory(item) },
-                        label = { Text(text = item) }
+                        label = { Text(text = item.category!!) }
                     )
 
                     Spacer(modifier = Modifier.width(5.dp))
@@ -138,7 +133,6 @@ fun HomeScreen(
 
             TaskCategoriesView(
                 modifier = Modifier.fillMaxWidth(),
-                tasks = tasks,
                 viewModel = viewModel
             )
         }
@@ -148,9 +142,10 @@ fun HomeScreen(
 @Composable
 private fun TaskCategoriesView(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel,
-    tasks: List<Task>
+    viewModel: HomeViewModel
 ) {
+    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+
     LazyColumn(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -189,7 +184,8 @@ private fun TaskItem(
                 .size(20.dp),
             selected = task.isCompleted,
             onClick = {
-                viewModel.updateTaskStatus(task = task)
+                viewModel
+                    .updateTaskStatusFirebase(task = task)
             }
         )
 
@@ -200,6 +196,8 @@ private fun TaskItem(
         ) {
             Text(
                 text = task.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.secondary,
                 style = MaterialTheme.typography.bodyLarge,
                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
@@ -207,7 +205,7 @@ private fun TaskItem(
             )
 
             Text(
-                text = task.description,
+                text = task.description ?: "",
                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                 style = MaterialTheme.typography.bodySmall
             )
