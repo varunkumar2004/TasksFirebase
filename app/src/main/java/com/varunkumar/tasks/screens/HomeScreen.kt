@@ -1,5 +1,6 @@
 package com.varunkumar.tasks.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,8 +57,11 @@ import com.varunkumar.tasks.viewmodels.HomeViewModel
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
+    modifier: Modifier = Modifier,
     user: UserData
 ) {
+    Log.d("user received", user.toString())
+
     val viewModel = hiltViewModel<HomeViewModel>()
     val categoryState by viewModel.categoryState.collectAsStateWithLifecycle()
     val homeState by viewModel.homeState.collectAsStateWithLifecycle()
@@ -88,10 +92,11 @@ fun HomeScreen(
     }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopBar(
                 modifier = Modifier.fillMaxWidth(),
-                user = null,
+                user = user,
                 onProfileClick = {
                     showAccountAlert = true
                 }

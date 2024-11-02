@@ -53,7 +53,7 @@ class HomeViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     val homeState = _homeState.flatMapLatest { state ->
         when (state.showBottomSheet) {
-            false -> _homeState.update { it.copy(task = Task()) }
+            false -> resetTask()
             else -> {}
         }
 
@@ -61,8 +61,9 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), HomeState())
 
     val tasks = combine(_categoryState, _tasks) { state, tasks ->
-        tasks.filter {
-            true
+        tasks.filter { task ->
+            if (state.selectedCategory == TaskCategory("All")) true
+            else state.selectedCategory == task.taskCategory
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
 
@@ -150,8 +151,6 @@ class HomeViewModel @Inject constructor(
                     .set(_homeState.value.task)
                     .await()
 
-                getTasks()
-
                 _homeState.update {
                     it.copy(
                         result = Result.Success(true),
@@ -182,8 +181,6 @@ class HomeViewModel @Inject constructor(
                     .delete()
                     .await()
 
-                getTasks()
-
                 _homeState.update {
                     it.copy(
                         result = Result.Success(true),
@@ -205,16 +202,19 @@ class HomeViewModel @Inject constructor(
         try {
             viewModelScope.launch {
                 _homeState.update { it.copy(result = Result.Loading()) }
+                val newTask = task.copy(isCompleted = !task.isCompleted)
 
                 firestore
                     .collection(user.uid)
                     .document(task.creationTime.toString())
-                    .update("isCompleted", !task.isCompleted)
+                    .set(newTask)
                     .await()
 
                 getTasks()
 
-                _homeState.update { it.copy(result = Result.Success(true)) }
+                _homeState.update { it.copy(
+                    result = Result.Success(data = true, message = "Task Updated")
+                ) }
             }
         } catch (e: Exception) {
             _homeState.update { it.copy(result = Result.Error(e.message)) }
@@ -223,6 +223,10 @@ class HomeViewModel @Inject constructor(
 
     private fun resetTask() {
         _homeState.update { it.copy(task = Task()) }
+    }
+
+    private fun getTasksFirebase() {
+
     }
 
     private fun getTasks() {
@@ -251,8 +255,16 @@ class HomeViewModel @Inject constructor(
                                 querySnapshot.documents.mapNotNull { snapshot ->
                                     val task = snapshot.toObject(Task::class.java)
 
-                                    task?.taskCategory?.let {
+                                    Log.d("new task", task.toString())
 
+                                    task?.taskCategory?.let { tk ->
+                                        _categoryState.update {
+                                            it.copy(
+                                                categories = it.categories.apply {
+                                                    add(tk)
+                                                }
+                                            )
+                                        }
                                     }
 
                                     task
@@ -282,5 +294,5 @@ data class HomeState(
 data class CategoryState(
     val selectedCategory: TaskCategory = TaskCategory("All"),
     val isUpdatingTask: Boolean = false,
-    val categories: MutableSet<TaskCategory> = mutableSetOf()
+    val categories: MutableSet<TaskCategory> = mutableSetOf(TaskCategory("All"))
 )
