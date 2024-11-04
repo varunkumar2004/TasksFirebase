@@ -80,14 +80,8 @@ fun AddTaskScreen(
             value = state.task.taskCategory?.category ?: "",
             singleLine = true,
             shape = RoundedCornerShape(20.dp),
-            placeholder = { Text(text = "Category (Optional)") },
+            label = { Text(text = "Category (Optional)") },
             onValueChange = viewModel::updateTaskCategory
-        )
-
-        TaskImage(
-            modifier = fModifier,
-            image = state.task.imageUri,
-            viewModel = viewModel,
         )
 
         TaskButtons(
@@ -253,8 +247,8 @@ private fun TaskButtons(
             if (isUpdatingTask) {
                 Button(
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.secondary
+                        containerColor = Color.Red,
+                        contentColor = Color.White
                     ),
                     onClick = { viewModel.deleteTaskFirebase() }
                 ) {

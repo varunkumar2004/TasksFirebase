@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                                 val signInResult = googleAuthUiClient.signInWithIntent(
                                     intent = result.data ?: return@launch
                                 )
+
                                 signInViewModel.onSignInResult(signInResult)
                             }
                         }
@@ -91,8 +92,14 @@ class MainActivity : ComponentActivity() {
                     startDestination = SignInScreen
                 ) {
                     composable<HomeScreenRoute> {
-                      HomeScreen(
-                            user = googleAuthUiClient.getSignedInUser() ?: UserData()
+                        HomeScreen(
+                            user = googleAuthUiClient.getSignedInUser() ?: UserData(),
+                            onSignOutRequest = {
+                                lifecycleScope.launch {
+                                    googleAuthUiClient.signOut()
+                                    navController.navigate(SignInScreen)
+                                }
+                            }
                         )
                     }
 
