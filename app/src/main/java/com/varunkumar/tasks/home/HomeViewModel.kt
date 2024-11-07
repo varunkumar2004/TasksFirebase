@@ -1,6 +1,13 @@
-package com.varunkumar.tasks.viewmodels
+package com.varunkumar.tasks.home
 
+import android.annotation.SuppressLint
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import android.util.Log
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TimePickerState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -9,8 +16,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.snapshots
 import com.varunkumar.tasks.models.Task
 import com.varunkumar.tasks.models.TaskCategory
+import com.varunkumar.tasks.notification.AndroidTaskScheduler
+import com.varunkumar.tasks.notification.TaskSchedulerReceiver
+import com.varunkumar.tasks.notification.TaskSchedulerService
 import com.varunkumar.tasks.utils.Result
+import com.varunkumar.tasks.utils.formatTimePickerStateToLong
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,15 +38,23 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val taskScheduler: AndroidTaskScheduler
 ) : ViewModel() {
+    private val user = getCurrentUser()
+
+    private val firestoreRef = firestore.collection(user.uid)
+
     private val _homeState = MutableStateFlow(HomeState())
+
     private val _resultState = MutableStateFlow<Result<Boolean>>(Result.Success(true))
+
     private val _categoryState = MutableStateFlow(CategoryState())
-    private val user = getCurrentUser()!!
+
     var searchQuery = MutableStateFlow("")
         private set
-    private val _tasks = firestore.collection(user.uid).snapshots()
+
+    private val _tasks = firestoreRef.snapshots()
 
     val resultState = _resultState.asStateFlow()
 
@@ -57,7 +77,7 @@ class HomeViewModel @Inject constructor(
         val allTasks = tasks.documents.mapNotNull { doc ->
             val tk = doc.toObject(Task::class.java)
 
-            tk?.taskCategory?.let { category ->
+            tk?.category?.let { category ->
                 _categoryState.update {
                     it.copy(categories = it.categories.apply { add(category) })
                 }
@@ -66,10 +86,10 @@ class HomeViewModel @Inject constructor(
             tk
         }
 
-        when (state.selectedCategory.category) {
-            "All" -> allTasks
+        when (state.selectedCategory.tag) {
+            "All" -> allTasks.filter { it.title.contains(query) }
             else -> allTasks.filter {
-                it.taskCategory?.category == state.selectedCategory.category && it.title.contains(query)
+                it.category?.tag == state.selectedCategory.tag && it.title.contains(query)
             }
         }
 
@@ -106,28 +126,21 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun updateImageUri(newImageUri: String?) {
-        _homeState.update {
-            it.copy(
-                task = it.task.copy(imageUri = newImageUri)
-            )
-        }
-    }
-
     fun updateTaskCategory(newCategory: String) {
         _homeState.update {
             val category = newCategory.trim()
 
             it.copy(
-                task = it.task.copy(taskCategory = TaskCategory(category))
+                task = it.task.copy(category = TaskCategory(category))
             )
         }
     }
 
-    fun updateTimeStamps(startTime: String) {
+    @OptIn(ExperimentalMaterial3Api::class)
+    fun updateTimeStamp(timePickerState: TimePickerState) {
         _homeState.update {
             it.copy(
-                task = it.task.copy(startTaskTime = startTime)
+                task = it.task.copy(scheduledTime = formatTimePickerStateToLong(timePickerState))
             )
         }
     }
@@ -157,11 +170,12 @@ class HomeViewModel @Inject constructor(
                     _homeState.update { it.copy(task = it.task.copy(creationTime = dateTime)) }
                 }
 
-                firestore
-                    .collection(user.uid)
+                firestoreRef
                     .document(dateTime.toString())
                     .set(_homeState.value.task)
                     .await()
+
+                scheduleTaskReminder()
 
                 _homeState.update { it.copy(showBottomSheet = false) }
                 _resultState.update { Result.Success(true) }
@@ -177,8 +191,7 @@ class HomeViewModel @Inject constructor(
             viewModelScope.launch {
                 _resultState.update { Result.Loading() }
 
-                firestore
-                    .collection(user.uid)
+                firestoreRef
                     .document(_homeState.value.task.creationTime.toString())
                     .delete()
                     .await()
@@ -201,10 +214,9 @@ class HomeViewModel @Inject constructor(
         try {
             viewModelScope.launch {
                 _resultState.update { Result.Loading() }
-                val newTask = task.copy(completed = !task.completed)
+                val newTask = task.copy(status = !task.status)
 
-                firestore
-                    .collection(user.uid)
+                firestoreRef
                     .document(task.creationTime.toString())
                     .set(newTask)
                     .await()
@@ -227,8 +239,8 @@ class HomeViewModel @Inject constructor(
         _homeState.update { it.copy(task = Task()) }
     }
 
-    private fun getCurrentUser(): FirebaseUser? {
-        return firebaseAuth.currentUser
+    private fun getCurrentUser(): FirebaseUser {
+        return firebaseAuth.currentUser ?: throw Exception("User not logged in")
     }
 
     private fun resetCategoriesSet() {
@@ -240,6 +252,13 @@ class HomeViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+//    @SuppressLint("ScheduleExactAlarm")
+    private fun scheduleTaskReminder() {
+        taskScheduler.schedule(
+            item = _homeState.value.task
+        )
     }
 }
 

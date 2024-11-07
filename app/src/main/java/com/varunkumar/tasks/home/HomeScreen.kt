@@ -1,13 +1,9 @@
-package com.varunkumar.tasks.screens
+package com.varunkumar.tasks.home
 
-import android.content.Context
 import android.util.Log
-import android.widget.Filter
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -18,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -31,27 +26,18 @@ import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.FilterAltOff
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TimeInput
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,13 +55,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.varunkumar.tasks.models.Task
 import com.varunkumar.tasks.models.TaskCategory
-import com.varunkumar.tasks.models.UserData
-import com.varunkumar.tasks.presentation.components.ProfileImage
-import com.varunkumar.tasks.presentation.components.TopBar
-import com.varunkumar.tasks.utils.Result
-import com.varunkumar.tasks.utils.formatTime
-import com.varunkumar.tasks.viewmodels.CategoryState
-import com.varunkumar.tasks.viewmodels.HomeViewModel
+import com.varunkumar.tasks.sign_in.UserData
+import com.varunkumar.tasks.home.components.ProfileImage
+import com.varunkumar.tasks.home.components.TopBar
+import com.varunkumar.tasks.utils.formatLongToString
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -127,7 +109,8 @@ fun HomeScreen(
             onDismissRequest = { viewModel.updateBottomSheet(false) }
         ) {
             AddTaskScreen(
-                viewModel = viewModel
+                viewModel = viewModel,
+                state = homeState
             )
         }
     }
@@ -148,7 +131,6 @@ fun HomeScreen(
         modifier = modifier,
         topBar = {
             TopBar(
-                modifier = Modifier.fillMaxWidth(),
                 user = user,
                 onProfileClick = {
                     showAccountAlert = true
@@ -177,38 +159,35 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-          Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    modifier = Modifier
-                        .height(TextFieldDefaults.MinHeight),
-                    onClick = { showAlert = !showAlert }
-                ) {
-                    Icon(
-                        imageVector =
-                        if (categoryState.selectedCategory != TaskCategory("All"))
-                            Icons.Outlined.FilterAlt
-                        else Icons.Outlined.FilterAltOff,
-                        contentDescription = "null"
-                    )
-                }
-
-                OutlinedTextField(
-                    modifier = Modifier
-                        .weight(1f),
-                    shape = RoundedCornerShape(20.dp),
-                    value = searchQuery,
-                    trailingIcon = {
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                value = searchQuery,
+                leadingIcon = {
+                    IconButton(
+                        modifier = Modifier
+                            .height(TextFieldDefaults.MinHeight),
+                        onClick = { showAlert = !showAlert }
+                    ) {
                         Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = null
+                            imageVector =
+                            if (categoryState.selectedCategory != TaskCategory("All"))
+                                Icons.Outlined.FilterAlt
+                            else Icons.Outlined.FilterAltOff,
+                            contentDescription = "null"
                         )
-                    },
-                    placeholder = { Text(text = "Search") },
-                    onValueChange = viewModel::updateSearchQuery
-                )
-            }
+                    }
+                },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = null
+                    )
+                },
+                placeholder = { Text(text = "Search") },
+                onValueChange = viewModel::updateSearchQuery
+            )
 
             TaskCategoriesView(
                 modifier = Modifier.fillMaxWidth(),
@@ -255,15 +234,15 @@ private fun TaskItem(
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Log.d("task received completion", task.completed.toString())
+        Log.d("task received completion", task.status.toString())
 
         RadioButton(
             modifier = Modifier
                 .size(20.dp),
-            selected = task.completed,
+            selected = task.status,
             onClick = {
                 viewModel
                     .updateTaskStatusFirebase(task = task)
@@ -281,20 +260,20 @@ private fun TaskItem(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.secondary,
                 style = MaterialTheme.typography.bodyLarge,
-                textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None,
+                textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
                 text = task.description ?: "",
-                textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None,
+                textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None,
                 style = MaterialTheme.typography.bodySmall
             )
         }
 
-        task.startTaskTime?.let { time ->
+        task.scheduledTime?.let { time ->
             Text(
-                text = time,
+                text = formatLongToString(time),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -349,18 +328,15 @@ private fun AccountAlert(
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 ProfileImage(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainer),
-                    user = user
+                    user = user,
+                    size = 60.dp
                 )
 
                 Text(
-                    text = user.username ?: "noting",
+                    text = user.username ?: "null",
                     color = MaterialTheme.colorScheme.onBackground,
                     style = MaterialTheme.typography.bodyLarge
                 )
@@ -422,7 +398,7 @@ private fun FilterAlert(
                         FilterChip(
                             selected = state.selectedCategory == item,
                             onClick = { viewModel.updateSelectedCategory(item) },
-                            label = { Text(text = item.category) }
+                            label = { Text(text = item.tag) }
                         )
                     }
                 }

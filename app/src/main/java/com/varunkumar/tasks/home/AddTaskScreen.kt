@@ -1,4 +1,4 @@
-package com.varunkumar.tasks.screens
+package com.varunkumar.tasks.home
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,33 +44,33 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.varunkumar.tasks.models.Task
-import com.varunkumar.tasks.utils.formatTime
-import com.varunkumar.tasks.viewmodels.HomeViewModel
+import com.varunkumar.tasks.utils.formatLongToString
+import com.varunkumar.tasks.utils.formatTimeToTimePickerStateToString
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskScreen(
-    viewModel: HomeViewModel
+    viewModel: HomeViewModel,
+    state: HomeState
 ) {
-    val fModifier = Modifier.fillMaxWidth()
-    val state by viewModel.homeState.collectAsStateWithLifecycle()
-
     Column(
         modifier = Modifier
+            .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .padding(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            modifier = fModifier,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
             text = "${if (state.isUpdatingTask) "Update" else "Add"} Task",
             style = MaterialTheme.typography.headlineSmall
         )
 
         TaskTitle(
-            modifier = fModifier,
+            modifier = Modifier.fillMaxWidth(),
             task = state.task,
             onValueTitleChange = viewModel::updateTitle,
             onValueDescriptionChange = viewModel::updateDescription
@@ -77,7 +78,7 @@ fun AddTaskScreen(
 
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = state.task.taskCategory?.category ?: "",
+            value = state.task.category?.tag ?: "",
             singleLine = true,
             shape = RoundedCornerShape(20.dp),
             label = { Text(text = "Category (Optional)") },
@@ -85,10 +86,11 @@ fun AddTaskScreen(
         )
 
         TaskButtons(
-            modifier = fModifier,
+            modifier = Modifier.fillMaxWidth(),
             task = state.task,
-            viewModel = viewModel,
             isUpdatingTask = state.isUpdatingTask,
+            onTaskDelete = viewModel::deleteTaskFirebase,
+            onUpdateTimeStamp = viewModel::updateTimeStamp,
             onDismissRequest = {
                 viewModel.addTaskFirebase(state.isUpdatingTask)
             }
@@ -135,73 +137,15 @@ private fun TaskTitle(
     }
 }
 
-@Composable
-private fun TaskImage(
-    modifier: Modifier = Modifier,
-    image: String?,
-    viewModel: HomeViewModel
-) {
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null && uri != Uri.EMPTY) {
-            viewModel.updateImageUri(uri.toString())
-        }
-    }
-
-    OutlinedCard(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        onClick = {
-            launcher.launch(
-                PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
-                )
-            )
-        }
-    ) {
-        Box(
-            modifier = modifier
-                .padding(16.dp)
-                .heightIn(min = 100.dp, max = 100.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (image == null) {
-                    Icon(
-                        imageVector = Icons.Default.Image,
-                        contentDescription = null
-                    )
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Text(text = "Select Image")
-                } else {
-                    Text(text = "Image")
-
-                    Spacer(modifier = Modifier.width(20.dp))
-
-                    AsyncImage(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp)),
-                        model = image,
-                        contentDescription = null
-                    )
-                }
-            }
-        }
-    }
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskButtons(
     modifier: Modifier = Modifier,
     task: Task,
     isUpdatingTask: Boolean,
-    viewModel: HomeViewModel,
-    onDismissRequest: () -> Unit
+    onTaskDelete: () -> Unit,
+    onDismissRequest: () -> Unit,
+    onUpdateTimeStamp: (TimePickerState) -> Unit
 ) {
     var showTimeAlert by remember {
         mutableStateOf(false)
@@ -213,9 +157,7 @@ private fun TaskButtons(
                 .clip(RoundedCornerShape(20.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .padding(10.dp),
-            onAddTimeButtonClick = {
-                viewModel.updateTimeStamps(it)
-            },
+            onAddTimeButtonClick = onUpdateTimeStamp,
             onDismissRequest = {
                 showTimeAlert = false
             }
@@ -230,8 +172,8 @@ private fun TaskButtons(
         TextButton(
             onClick = { showTimeAlert = true }
         ) {
-            if (task.startTaskTime != null) {
-                Text(text = task.startTaskTime)
+            if (task.scheduledTime != null) {
+                Text(text = formatLongToString(task.scheduledTime))
             } else {
                 Icon(
                     imageVector = Icons.Outlined.MoreTime,
@@ -250,7 +192,7 @@ private fun TaskButtons(
                         containerColor = Color.Red,
                         contentColor = Color.White
                     ),
-                    onClick = { viewModel.deleteTaskFirebase() }
+                    onClick = onTaskDelete
                 ) {
                     Text(text = "Delete")
                 }
@@ -271,7 +213,7 @@ private fun TaskButtons(
 @Composable
 private fun TimeAlert(
     modifier: Modifier = Modifier,
-    onAddTimeButtonClick: (String) -> Unit,
+    onAddTimeButtonClick: (TimePickerState) -> Unit,
     onDismissRequest: () -> Unit
 ) {
     val timeStartState = rememberTimePickerState()
@@ -299,9 +241,7 @@ private fun TimeAlert(
             ) {
                 Button(
                     onClick = {
-                        val formatStartTime = formatTime(timeStartState)
-
-                        onAddTimeButtonClick(formatStartTime)
+                        onAddTimeButtonClick(timeStartState)
                         onDismissRequest()
                     }
                 ) {

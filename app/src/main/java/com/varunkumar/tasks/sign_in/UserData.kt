@@ -1,4 +1,4 @@
-package com.varunkumar.tasks.models
+package com.varunkumar.tasks.sign_in
 
 import kotlinx.serialization.Serializable
 

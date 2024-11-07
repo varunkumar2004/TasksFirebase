@@ -1,7 +1,6 @@
 package com.varunkumar.tasks.sign_in
 
 import androidx.lifecycle.ViewModel
-import com.varunkumar.tasks.models.UserData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
