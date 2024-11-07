@@ -1,6 +1,7 @@
 package com.varunkumar.tasks.home
 
 import android.util.Log
+import android.widget.Space
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,18 +15,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.FilterAltOff
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -48,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,7 +60,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.varunkumar.tasks.models.Task
 import com.varunkumar.tasks.models.TaskCategory
 import com.varunkumar.tasks.sign_in.UserData
-import com.varunkumar.tasks.home.components.ProfileImage
 import com.varunkumar.tasks.home.components.TopBar
 import com.varunkumar.tasks.utils.formatLongToString
 
@@ -90,19 +93,19 @@ fun HomeScreen(
 //        result = resultState
 //    )
 
-    FilterAlert(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceBright)
-            .padding(16.dp),
-        showAlert = showAlert,
-        state = categoryState,
-        viewModel = viewModel,
-        onShowAlertChange = {
-            showAlert = !showAlert
-        }
-    )
+    if (showAlert) {
+        FilterAlert(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surfaceBright),
+            state = categoryState,
+            viewModel = viewModel,
+            onDismissRequest = {
+                showAlert = !showAlert
+            }
+        )
+    }
 
     if (homeState.showBottomSheet) {
         ModalBottomSheet(
@@ -119,8 +122,7 @@ fun HomeScreen(
         AccountAlert(
             modifier = Modifier
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(10.dp),
+                .background(MaterialTheme.colorScheme.surfaceContainer),
             user = user,
             onDismissRequest = { showAccountAlert = false },
             onSignOutRequest = onSignOutRequest
@@ -131,7 +133,6 @@ fun HomeScreen(
         modifier = modifier,
         topBar = {
             TopBar(
-                user = user,
                 onProfileClick = {
                     showAccountAlert = true
                 }
@@ -244,15 +245,14 @@ private fun TaskItem(
                 .size(20.dp),
             selected = task.status,
             onClick = {
-                viewModel
-                    .updateTaskStatusFirebase(task = task)
+                viewModel.updateTaskStatusFirebase(task = task)
             }
         )
 
         Column(
             modifier = Modifier
                 .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
                 text = task.title,
@@ -264,11 +264,21 @@ private fun TaskItem(
                 fontWeight = FontWeight.Bold
             )
 
-            Text(
-                text = task.description ?: "",
-                textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None,
-                style = MaterialTheme.typography.bodySmall
-            )
+            task.description?.let {
+                Text(
+                    text = task.description,
+                    textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            task.category?.let {
+                Text(
+                    text = "#${it.tag}",
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
 
         task.scheduledTime?.let { time ->
@@ -280,7 +290,6 @@ private fun TaskItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AccountAlert(
     modifier: Modifier = Modifier,
@@ -288,61 +297,30 @@ private fun AccountAlert(
     onSignOutRequest: () -> Unit,
     onDismissRequest: () -> Unit
 ) {
-    BasicAlertDialog(
+    AlertDialog(
         modifier = modifier,
-        onDismissRequest = onDismissRequest
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-
-            Row(
+        title = {
+            Text(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismissRequest) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        tint = MaterialTheme.colorScheme.primary,
-                        contentDescription = null
-                    )
-                }
-
-                IconButton(onClick = onSignOutRequest) {
-                    Icon(
-                        imageVector = Icons.Default.Login,
-                        tint = MaterialTheme.colorScheme.primary,
-                        contentDescription = null
-                    )
-                }
+                textAlign = TextAlign.Center,
+                text = user.username ?: "null"
+            )
+        },
+        text = {
+            Row {
+                Icon(imageVector = Icons.Outlined.Error, contentDescription = null)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(text = "Are you sure you want to sign out of ${user.username}! You can still recover all the tasks after signing in again.")
             }
 
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                ProfileImage(
-                    user = user,
-                    size = 60.dp
-                )
-
-                Text(
-                    text = user.username ?: "null",
-                    color = MaterialTheme.colorScheme.onBackground,
-                    style = MaterialTheme.typography.bodyLarge
-                )
+        },
+        onDismissRequest = onDismissRequest,
+        confirmButton = {
+            Button(onClick = onSignOutRequest) {
+                Text(text = "Sign Out")
             }
         }
-    }
+    )
 }
 
 //@Composable
@@ -366,29 +344,32 @@ private fun AccountAlert(
 //
 //}
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterAlert(
     modifier: Modifier = Modifier,
     state: CategoryState,
-    showAlert: Boolean,
     viewModel: HomeViewModel,
-    onShowAlertChange: () -> Unit
+    onDismissRequest: () -> Unit
 ) {
-    if (showAlert) {
-        BasicAlertDialog(
-            modifier = modifier,
-            onDismissRequest = { onShowAlertChange() }
-        ) {
-            Column(
-                modifier = modifier,
-                verticalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
+    AlertDialog(
+        modifier = modifier,
+        title = {
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                text = "Filter Tasks"
+            )
+        },
+        text = {
+            Column {
                 Text(
-                    text = "Select Category",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    text = "Filter Tasks on the basis of task category."
                 )
+
+                Spacer(modifier = Modifier.height(5.dp))
 
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -403,6 +384,12 @@ private fun FilterAlert(
                     }
                 }
             }
+        },
+        onDismissRequest = onDismissRequest,
+        confirmButton = {
+            Button(onClick = onDismissRequest) {
+                Text(text = "Done")
+            }
         }
-    }
+    )
 }

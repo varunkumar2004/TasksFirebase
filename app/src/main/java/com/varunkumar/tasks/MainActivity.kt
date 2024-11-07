@@ -135,8 +135,8 @@ class MainActivity : ComponentActivity() {
                             user = googleAuthUiClient.getSignedInUser() ?: UserData(),
                             onSignOutRequest = {
                                 lifecycleScope.launch {
-                                    googleAuthUiClient.signOut()
                                     navController.navigate(SignInScreen)
+                                    googleAuthUiClient.signOut()
                                 }
                             }
                         )

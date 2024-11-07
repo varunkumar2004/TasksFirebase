@@ -88,6 +88,7 @@ class HomeViewModel @Inject constructor(
 
         when (state.selectedCategory.tag) {
             "All" -> allTasks.filter { it.title.contains(query) }
+            "Completed" -> allTasks.filter { it.status && it.title.contains(query) }
             else -> allTasks.filter {
                 it.category?.tag == state.selectedCategory.tag && it.title.contains(query)
             }
@@ -249,12 +250,12 @@ class HomeViewModel @Inject constructor(
                 categories = it.categories.apply {
                     clear()
                     add(TaskCategory("All"))
+                    add(TaskCategory("Completed"))
                 }
             )
         }
     }
 
-//    @SuppressLint("ScheduleExactAlarm")
     private fun scheduleTaskReminder() {
         taskScheduler.schedule(
             item = _homeState.value.task
@@ -272,5 +273,8 @@ data class HomeState(
 data class CategoryState(
     val selectedCategory: TaskCategory = TaskCategory("All"),
     val isUpdatingTask: Boolean = false,
-    val categories: MutableSet<TaskCategory> = mutableSetOf(TaskCategory("All"))
+    val categories: MutableSet<TaskCategory> = mutableSetOf(
+        TaskCategory("All"),
+        TaskCategory("Completed")
+    )
 )

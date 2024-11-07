@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.MoreTime
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
@@ -25,6 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -187,14 +189,11 @@ private fun TaskButtons(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isUpdatingTask) {
-                Button(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Red,
-                        contentColor = Color.White
-                    ),
-                    onClick = onTaskDelete
-                ) {
-                    Text(text = "Delete")
+                OutlinedIconButton(onClick = onTaskDelete) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription =  null
+                    )
                 }
             }
 
