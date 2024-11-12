@@ -29,7 +29,7 @@ class TaskSchedulerService(
 
     private fun buildNotification(taskTitle: String, taskDescription: String): Notification {
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.task_img) // Replace with your own icon
+            .setSmallIcon(R.drawable.ic_launcher) // Replace with your own icon
             .setContentTitle(taskTitle)
             .setContentText(taskDescription)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

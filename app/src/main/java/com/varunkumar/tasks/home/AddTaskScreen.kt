@@ -19,11 +19,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.MoreTime
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedIconButton
@@ -33,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -156,13 +160,9 @@ private fun TaskButtons(
     if (showTimeAlert) {
         TimeAlert(
             modifier = modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(10.dp),
+                .clip(RoundedCornerShape(20.dp)),
             onAddTimeButtonClick = onUpdateTimeStamp,
-            onDismissRequest = {
-                showTimeAlert = false
-            }
+            onDismissRequest = { showTimeAlert = false }
         )
     }
 
@@ -189,7 +189,13 @@ private fun TaskButtons(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isUpdatingTask) {
-                OutlinedIconButton(onClick = onTaskDelete) {
+                IconButton(
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    onClick = onTaskDelete
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.Delete,
                         contentDescription =  null
@@ -217,36 +223,27 @@ private fun TimeAlert(
 ) {
     val timeStartState = rememberTimePickerState()
 
-    BasicAlertDialog(
-        modifier = modifier,
-        onDismissRequest = onDismissRequest
-    ) {
-        Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
             Text(
                 modifier = modifier,
                 textAlign = TextAlign.Center,
-                text = "Task Time",
-                style = MaterialTheme.typography.headlineSmall
+                text = "Task Time"
             )
-
-            TimeInput(state = timeStartState)
-
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Button(
-                    onClick = {
-                        onAddTimeButtonClick(timeStartState)
-                        onDismissRequest()
-                    }
-                ) {
-                    Text(text = "Done")
+        },
+        text = {
+            TimePicker(state = timeStartState)
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onAddTimeButtonClick(timeStartState)
+                    onDismissRequest()
                 }
+            ) {
+                Text(text = "Done")
             }
         }
-    }
+    )
 }

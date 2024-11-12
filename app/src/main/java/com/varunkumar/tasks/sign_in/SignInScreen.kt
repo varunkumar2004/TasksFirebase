@@ -61,7 +61,7 @@ fun SignInScreen(
                 .size(80.dp)
                 .clip(CircleShape)
                 .background(Color.White),
-            painter = painterResource(id = R.drawable.task_img),
+            painter = painterResource(id = R.drawable.ic_launcher),
             contentDescription = "Logo",
             colorFilter = ColorFilter.tint(
                 color = Color.Transparent,
