@@ -1,7 +1,6 @@
 package com.varunkumar.tasks.home
 
 import android.util.Log
-import android.widget.Space
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,29 +17,34 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FilterAlt
-import androidx.compose.material.icons.outlined.FilterAltOff
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +67,7 @@ import com.varunkumar.tasks.models.TaskCategory
 import com.varunkumar.tasks.sign_in.UserData
 import com.varunkumar.tasks.home.components.TopBar
 import com.varunkumar.tasks.utils.formatLongToString
+import kotlinx.coroutines.selects.select
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -77,6 +83,7 @@ fun HomeScreen(
     val homeState by viewModel.homeState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
 
     var showAlert by remember {
         mutableStateOf(false)
@@ -86,19 +93,8 @@ fun HomeScreen(
         mutableStateOf(false)
     }
 
-//    ResultStatus(
-//        modifier = Modifier
-//            .fillMaxSize(),
-//        context = context,
-//        result = resultState
-//    )
-
     if (showAlert) {
         FilterAlert(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceBright),
             state = categoryState,
             viewModel = viewModel,
             onDismissRequest = {
@@ -120,9 +116,6 @@ fun HomeScreen(
 
     if (showAccountAlert) {
         AccountAlert(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer),
             user = user,
             onDismissRequest = { showAccountAlert = false },
             onSignOutRequest = onSignOutRequest
@@ -165,65 +158,177 @@ fun HomeScreen(
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 value = searchQuery,
-                leadingIcon = {
-                    IconButton(
-                        modifier = Modifier
-                            .height(TextFieldDefaults.MinHeight),
-                        onClick = { showAlert = !showAlert }
-                    ) {
-                        Icon(
-                            imageVector =
-                            if (categoryState.selectedCategory != TaskCategory("All"))
-                                Icons.Outlined.FilterAlt
-                            else Icons.Outlined.FilterAltOff,
-                            contentDescription = "null"
-                        )
-                    }
-                },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null
-                    )
-                },
-                placeholder = { Text(text = "Search") },
+                placeholder = { Text(text = "Search tasks") },
                 onValueChange = viewModel::updateSearchQuery
             )
 
-            TaskCategoriesView(
-                modifier = Modifier.fillMaxWidth(),
-                viewModel = viewModel
+            TaskItemsContainer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(16.dp),
+                tasks = tasks,
+                selectedCategory = categoryState.selectedCategory,
+                onCategoryChangeClick = { showAlert = !showAlert },
+                onTaskItemClick = {
+                    viewModel.updateTask(it)
+                },
+                onTaskStatusClick = {
+                    viewModel.updateTaskStatusFirebase(it)
+                },
+                onUpdateTaskCategory = {
+                    viewModel.updateSelectedCategory(it)
+                }
             )
         }
     }
 }
 
 @Composable
-private fun TaskCategoriesView(
+private fun TaskItemsContainer(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel
+    tasks: List<Task>,
+    selectedCategory: TaskCategory,
+    onCategoryChangeClick: () -> Unit,
+    onTaskItemClick: (Task) -> Unit,
+    onTaskStatusClick: (Task) -> Unit,
+    onUpdateTaskCategory: (TaskCategory) -> Unit
 ) {
-    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
-
-    LazyColumn(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        itemsIndexed(tasks) { index, item ->
-            TaskItem(
-                modifier = modifier
-                    .clip(RoundedCornerShape(5.dp))
-                    .clickable {
-                        viewModel.updateTask(item)
-                    }
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(16.dp),
-                viewModel = viewModel,
-                task = item
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = selectedCategory.tag,
+                style = MaterialTheme.typography.bodyLarge
             )
 
-            if (index != tasks.lastIndex) Spacer(modifier = Modifier.height(2.dp))
+            Icon(
+                modifier = Modifier
+                    .clickable { onCategoryChangeClick() },
+                imageVector = Icons.Outlined.FilterAlt,
+                contentDescription = null
+            )
         }
+
+        if (tasks.isEmpty()) {
+            Text(text = "There are no tasks.")
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+            ) {
+                itemsIndexed(tasks) { index, task ->
+                    TaskItem(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .clickable { onTaskItemClick(task) },
+                        task = task,
+                        showCategory = selectedCategory == TaskCategory("All"),
+                        onTaskStatusClick = { onTaskStatusClick(task) },
+                        updateSelectedCategory = { onUpdateTaskCategory(it) }
+                    )
+
+                    if (index != tasks.lastIndex) Spacer(modifier = Modifier.height(2.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskItem(
+    modifier: Modifier = Modifier,
+    showCategory: Boolean = false,
+    task: Task,
+    onTaskStatusClick: () -> Unit,
+    updateSelectedCategory: (TaskCategory) -> Unit
+) {
+    ListItem(
+        modifier = modifier,
+        headlineContent = {
+            Text(
+                text = task.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyLarge,
+                textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        supportingContent = {
+            Column {
+                task.description?.let {
+                    Text(
+                        text = it,
+                        textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None
+                    )
+                }
+
+                task.scheduledTime?.let {
+                    Spacer(modifier = Modifier.height(5.dp))
+
+                    Row(
+                        modifier = Modifier,
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        TagRow(
+                            content = {
+                                Icon(
+                                    modifier = Modifier.size(15.dp),
+                                    imageVector = Icons.Outlined.AccessTime,
+                                    contentDescription = null
+                                )
+
+                                Text(text = formatLongToString(it))
+                            }
+                        )
+
+                        if (showCategory && task.category != null) {
+                            TagRow(
+                                modifier = Modifier
+                                    .clickable { updateSelectedCategory(task.category) },
+                                content = {
+                                    Text(text = "#${task.category.tag}")
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        leadingContent = {
+            RadioButton(
+                modifier = Modifier
+                    .size(20.dp),
+                selected = task.status,
+                onClick = onTaskStatusClick
+            )
+        }
+    )
+}
+
+@Composable
+private fun TagRow(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(vertical = 5.dp, horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        content()
     }
 }
 
@@ -273,10 +378,14 @@ private fun TaskItem(
             }
 
             task.category?.let {
-                Text(
-                    text = "#${it.tag}",
-                    color = MaterialTheme.colorScheme.secondary,
-                    style = MaterialTheme.typography.bodySmall
+                AssistChip(
+                    onClick = { /*TODO*/ },
+                    label = {
+                        Text(
+                            text = it.tag,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 )
             }
         }
@@ -292,13 +401,13 @@ private fun TaskItem(
 
 @Composable
 private fun AccountAlert(
-    modifier: Modifier = Modifier,
     user: UserData,
     onSignOutRequest: () -> Unit,
     onDismissRequest: () -> Unit
 ) {
     AlertDialog(
-        modifier = modifier,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp)),
         title = {
             Text(
                 modifier = Modifier.fillMaxWidth(),
@@ -347,13 +456,13 @@ private fun AccountAlert(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterAlert(
-    modifier: Modifier = Modifier,
     state: CategoryState,
     viewModel: HomeViewModel,
     onDismissRequest: () -> Unit
 ) {
     AlertDialog(
-        modifier = modifier,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp)),
         title = {
             Text(
                 modifier = Modifier.fillMaxWidth(),
@@ -369,18 +478,28 @@ private fun FilterAlert(
                     text = "Filter Tasks on the basis of task category."
                 )
 
-                Spacer(modifier = Modifier.height(5.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                FlowRow(
+                LazyVerticalStaggeredGrid(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    columns = StaggeredGridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalItemSpacing = 2.dp
                 ) {
-                    state.categories.forEach { item ->
-                        FilterChip(
-                            selected = state.selectedCategory == item,
-                            onClick = { viewModel.updateSelectedCategory(item) },
-                            label = { Text(text = item.tag) }
-                        )
+                    state.categories.forEach { task ->
+                        item {
+                            Button(
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (state.selectedCategory != task)
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    else MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                ),
+                                onClick = { viewModel.updateSelectedCategory(task) },
+                            ) {
+                                Text(text = task.tag)
+                            }
+                        }
                     }
                 }
             }
