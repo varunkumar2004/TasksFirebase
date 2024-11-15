@@ -4,5 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class TaskCategory(
-    val tag: String = ""
+    val tag: String = "",
+    val color: Int = 1
 )

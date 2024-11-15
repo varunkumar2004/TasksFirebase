@@ -1,12 +1,11 @@
 package com.varunkumar.tasks.home
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,32 +18,26 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,14 +55,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.varunkumar.tasks.home.components.TopBar
 import com.varunkumar.tasks.models.Task
 import com.varunkumar.tasks.models.TaskCategory
 import com.varunkumar.tasks.sign_in.UserData
-import com.varunkumar.tasks.home.components.TopBar
 import com.varunkumar.tasks.utils.formatLongToString
-import kotlinx.coroutines.selects.select
+import com.varunkumar.tasks.utils.mapIntToColor
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -78,11 +71,8 @@ fun HomeScreen(
 ) {
     val viewModel = hiltViewModel<HomeViewModel>()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val resultState by viewModel.resultState.collectAsStateWithLifecycle()
     val categoryState by viewModel.categoryState.collectAsStateWithLifecycle()
     val homeState by viewModel.homeState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
 
     var showAlert by remember {
@@ -218,7 +208,18 @@ private fun TaskItemsContainer(
         }
 
         if (tasks.isEmpty()) {
-            Text(text = "There are no tasks.")
+            ListItem(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp)),
+                headlineContent = {
+                    Text(
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall,
+                        text = "There are no tasks."
+                    )
+                }
+            )
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -296,7 +297,14 @@ private fun TaskItem(
                                 modifier = Modifier
                                     .clickable { updateSelectedCategory(task.category) },
                                 content = {
-                                    Text(text = "#${task.category.tag}")
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(mapIntToColor(task.category.color))
+                                    )
+
+                                    Text(text = task.category.tag)
                                 }
                             )
                         }
@@ -329,73 +337,6 @@ private fun TagRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         content()
-    }
-}
-
-@Composable
-private fun TaskItem(
-    modifier: Modifier = Modifier,
-    viewModel: HomeViewModel,
-    task: Task
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Log.d("task received completion", task.status.toString())
-
-        RadioButton(
-            modifier = Modifier
-                .size(20.dp),
-            selected = task.status,
-            onClick = {
-                viewModel.updateTaskStatusFirebase(task = task)
-            }
-        )
-
-        Column(
-            modifier = Modifier
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = task.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.bodyLarge,
-                textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None,
-                fontWeight = FontWeight.Bold
-            )
-
-            task.description?.let {
-                Text(
-                    text = task.description,
-                    textDecoration = if (task.status) TextDecoration.LineThrough else TextDecoration.None,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            task.category?.let {
-                AssistChip(
-                    onClick = { /*TODO*/ },
-                    label = {
-                        Text(
-                            text = it.tag,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                )
-            }
-        }
-
-        task.scheduledTime?.let { time ->
-            Text(
-                text = formatLongToString(time),
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
     }
 }
 
@@ -453,7 +394,6 @@ private fun AccountAlert(
 //
 //}
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterAlert(
     state: CategoryState,

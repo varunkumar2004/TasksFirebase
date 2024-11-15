@@ -4,6 +4,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimePickerState
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,10 +32,7 @@ fun formatTimePickerStateToLong(
 }
 
 fun formatLongToString(time: Long): String {
-    val calendar = Calendar.getInstance().apply {
-        timeInMillis = time
-    }
-
-    val format = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    return format.format(calendar.time)
+    val date = Date(time)
+    val formatter = SimpleDateFormat("MMM dd, hh:mm a", Locale.ENGLISH)
+    return formatter.format(date)
 }

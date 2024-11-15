@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
@@ -52,8 +54,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.varunkumar.tasks.models.Task
+import com.varunkumar.tasks.models.TaskCategoryColor
 import com.varunkumar.tasks.utils.formatLongToString
 import com.varunkumar.tasks.utils.formatTimeToTimePickerStateToString
+import com.varunkumar.tasks.utils.mapIntToColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,13 +86,10 @@ fun AddTaskScreen(
             onValueDescriptionChange = viewModel::updateDescription
         )
 
-        OutlinedTextField(
+        TaskCategoryView(
             modifier = Modifier.fillMaxWidth(),
-            value = state.task.category?.tag ?: "",
-            singleLine = true,
-            shape = RoundedCornerShape(20.dp),
-            label = { Text(text = "Category (Optional)") },
-            onValueChange = viewModel::updateTaskCategory
+            state = state,
+            onUpdateTaskCategory = viewModel::updateTaskCategory
         )
 
         TaskButtons(
@@ -140,6 +141,43 @@ private fun TaskTitle(
             label = { Text(text = "Description") },
             onValueChange = onValueDescriptionChange
         )
+    }
+}
+
+@Composable
+private fun TaskCategoryView(
+    modifier: Modifier = Modifier,
+    state: HomeState,
+    onUpdateTaskCategory: (String) -> Unit
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        OutlinedTextField(
+            modifier = modifier,
+            value = state.task.category?.tag ?: "",
+            singleLine = true,
+            shape = RoundedCornerShape(20.dp),
+            label = { Text(text = "Category (Optional)") },
+            onValueChange = onUpdateTaskCategory
+        )
+
+        if (state.task.category != null && state.task.category.tag.isNotEmpty()) {
+            Row(
+                modifier = modifier,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                TaskCategoryColor.COLORS.forEach {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(it)
+                    )
+                }
+            }
+        }
     }
 }
 
